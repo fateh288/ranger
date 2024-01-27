@@ -60,6 +60,8 @@ public class ORCFileUtil {
     protected int                       orcBufferSize;
     protected long                      orcStripeSize;
 
+    protected Map<String,String>        schemaFieldTypeMap;
+
     public static ORCFileUtil getInstance() {
         ORCFileUtil orcFileUtil = me;
         if (orcFileUtil == null) {
@@ -125,11 +127,6 @@ public class ORCFileUtil {
             logger.debug("==> ORCFileUtil.log() : EventSize: " + eventBatchSize + "ORC bufferSize:" + orcBufferSize );
         }
 
-        //increase the batch size according to event size, so it can accomodate all the events.
-        if (eventBatchSize > orcBufferSize) {
-            batch  = schema.createRowBatch(orcBufferSize);
-        }
-
         try {
             for(AuthzAuditEvent event : events) {
                 int row = batch.size++;
@@ -183,7 +180,7 @@ public class ORCFileUtil {
             logger.debug("==> ORCWriter.initORCAuditSchema()");
         }
         auditSchema = getAuditSchema();
-        Map<String,String> schemaFieldTypeMap = getSchemaFieldTypeMap();
+        schemaFieldTypeMap = getSchemaFieldTypeMap();
         schema = TypeDescription.fromString(auditSchema);
         batch  = schema.createRowBatch(orcBufferSize);
         buildVectorRowBatch(schemaFieldTypeMap);

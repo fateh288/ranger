@@ -19,11 +19,17 @@ package org.apache.ranger.audit.utils;
  * under the License.
  */
 
+import org.apache.commons.cli.ParseException;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.orc.OrcFile;
+import org.apache.orc.Reader;
 import org.apache.ranger.audit.provider.MiscUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.security.PrivilegedExceptionAction;
 import java.util.concurrent.Executors;
@@ -34,6 +40,8 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Properties;
 
+import org.apache.orc.tools.convert.ConvertTool;
+
 /**
  * Writes the Ranger audit to HDFS as JSON text
  */
@@ -43,7 +51,7 @@ public class RangerJSONAuditWriter extends AbstractRangerAuditWriter {
     public static final String PROP_HDFS_ROLLOVER_ENABLE_PERIODIC_ROLLOVER     = "file.rollover.enable.periodic.rollover";
     public static final String PROP_HDFS_ROLLOVER_PERIODIC_ROLLOVER_CHECK_TIME = "file.rollover.periodic.rollover.check.sec";
 
-    protected String JSON_FILE_EXTENSION = ".log";
+    protected String JSON_FILE_EXTENSION = ".json";
 
     /*
      * When enableAuditFilePeriodicRollOver is enabled, Audit File in HDFS would be closed by the defined period in
@@ -81,6 +89,54 @@ public class RangerJSONAuditWriter extends AbstractRangerAuditWriter {
         if (logger.isDebugEnabled()) {
             logger.debug("<== RangerJSONAuditWriter.init()");
         }
+    }
+
+    private static long getOrcFileRowCount(String filePath) {
+        try {
+            Configuration conf = new Configuration();
+            Path orcFilePath = new Path(filePath);
+            long numRows;
+            try (Reader reader = OrcFile.createReader(orcFilePath, OrcFile.readerOptions(conf))) {
+                numRows = reader.getNumberOfRows();
+            }
+            return numRows;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return -1;
+    }
+
+    @Override
+    public void onWriterClosedAfterRollover() {
+        logger.debug("==> RangerJSONAuditWriter.onWriterClosedAfterRollover(): Writer closed for file "+currentFileName);
+        boolean isORCConversionEnabled = true;
+
+        if (isORCConversionEnabled){
+            String fileName = new String(currentFileName);
+            String[] args = new String[5];
+            args[0]=fileName;
+            args[1]="-o";
+            args[2]=fileName+".orc";
+            String orcFileName = args[2];
+            args[3]="-s";
+            args[4] = ORCFileUtil.getInstance().getAuditSchema();
+            logger.debug("Converting "+currentFileName+ " to orc and saving to "+orcFileName);
+            try {
+                ConvertTool.main(new Configuration(), args);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            } catch (ParseException e) {
+                throw new RuntimeException(e);
+            }
+//            try {
+//                Thread.sleep(6000);
+//            } catch (InterruptedException e) {
+//                throw new RuntimeException(e);
+//            }
+            long orclines = getOrcFileRowCount(orcFileName);
+            logger.debug("Written "+orclines+"rows to "+orcFileName);
+        }
+        logger.debug("<== RangerJSONAuditWriter.onWriterClosedAfterRollover()");
     }
 
     public void init() {

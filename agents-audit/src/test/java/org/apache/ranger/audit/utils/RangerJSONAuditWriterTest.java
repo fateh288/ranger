@@ -18,15 +18,18 @@
 
 package org.apache.ranger.audit.utils;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonPathCapabilities;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.orc.OrcFile;
+import org.apache.orc.Reader;
 import org.junit.Test;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.io.IOException;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.Properties;
-import java.util.Collections;
+import java.util.*;
 import java.io.PrintWriter;
 
 import static org.junit.Assert.assertTrue;
@@ -119,5 +122,56 @@ public class RangerJSONAuditWriterTest {
         assertTrue(jsonAuditWriter.logJSON(Collections.singleton("Second file created since rollover happened!")));
         jsonAuditWriter.fileSystem.deleteOnExit(jsonAuditWriter.auditPath); // cleanup
         jsonAuditWriter.closeWriter();
+    }
+    @Test
+    public void checkORCConversion() throws Exception {
+        RangerJSONAuditWriter jsonAuditWriter = spy(new RangerJSONAuditWriter());
+
+        setup();
+        props.setProperty("test.file.rollover.enable.periodic.rollover", "true");
+        props.setProperty("test.file.rollover.periodic.rollover.check.sec", "2");
+        // rollover log file after this interval
+        jsonAuditWriter.fileRolloverSec = 5; // in seconds
+        jsonAuditWriter.init(props, "test", "localfs", auditConfigs);
+
+        BufferedReader br = new BufferedReader(new FileReader("/Users/fateh.singh/Desktop/Ranger_Apache_Forked/ranger/agents-audit/target/spool_test_20240128-0214.33.log"));
+        List<String> lines = new ArrayList<String>();
+        String line;
+        while ((line = br.readLine()) != null) {
+            lines.add(line);
+        }
+        assertTrue(jsonAuditWriter.logJSON(lines));
+
+        //assertTrue(jsonAuditWriter.logJSON(Collections.singleton("{\"repoType\":0,\"evtTime\":\"2024-01-27 23:23:24.189\",\"result\":0,\"policy\":0,\"seq_num\":1,\"event_count\":1,\"event_dur_ms\":0}")));
+        //jsonAuditWriter.fileSystem.deleteOnExit(jsonAuditWriter.auditPath); // cleanup
+        Thread.sleep(6000);
+
+        assertFalse(jsonAuditWriter.reUseLastLogFile);
+
+        //assertNull(jsonAuditWriter.ostream);
+        //assertNull(jsonAuditWriter.logWriter);
+
+//        assertTrue(jsonAuditWriter.logJSON(Collections.singleton("Second file created since rollover happened!")));
+//        Thread.sleep(6000);
+
+        //jsonAuditWriter.fileSystem.deleteOnExit(jsonAuditWriter.auditPath); // cleanup
+        //jsonAuditWriter.closeWriter();
+    }
+    @Test public void numORcLines(){
+        String filename = "/tmp/20240128/_ranger_audit_21017.4.json_orc";
+        long rowcount = getOrcFileRowCount(filename);
+        System.out.println("count="+rowcount);
+    }
+    private static long getOrcFileRowCount(String filePath) {
+        try {
+            Configuration conf = new Configuration();
+            Path orcFilePath = new Path(filePath);
+            Reader reader = OrcFile.createReader(orcFilePath, OrcFile.readerOptions(conf));
+            long numRows = reader.getNumberOfRows();
+            return numRows;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return -1;
     }
 }

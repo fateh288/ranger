@@ -207,6 +207,7 @@ public abstract class AbstractRangerAuditWriter implements RangerAuditWriter {
         }
 
     }
+    abstract public void onWriterClosedAfterRollover();
 
     public void closeFileIfNeeded() {
         if (logger.isDebugEnabled()) {
@@ -224,6 +225,7 @@ public abstract class AbstractRangerAuditWriter implements RangerAuditWriter {
             logger.info("Closing file. Rolling over. name = {}, fileName = {}", auditProviderName, currentFileName);
             logWriter.flush();
             closeWriter();
+            onWriterClosedAfterRollover();
             resetWriter();
             currentFileName = null;
             reUseLastLogFile = false;

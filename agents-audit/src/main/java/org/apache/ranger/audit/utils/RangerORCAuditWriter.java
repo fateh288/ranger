@@ -61,6 +61,11 @@ public class RangerORCAuditWriter extends AbstractRangerAuditWriter {
         }
     }
 
+    @Override
+    public void onWriterClosedAfterRollover() {
+
+    }
+
     synchronized public boolean logAuditAsORC(final Collection<AuthzAuditEvent> events) throws  Exception {
         boolean ret = false;
         Writer  out = null;

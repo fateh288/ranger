@@ -331,6 +331,7 @@ public class ORCFileUtil {
             fieldStr = fieldStr.substring(0, fieldStr.length() - 1);
         }
         ret = fieldStr + ">";
+        logger.debug("schema="+ret);
 
         if (logger.isDebugEnabled()) {
             logger.debug("<== ORCWriter.getAuditSchema()  AuditSchema: " + ret);
